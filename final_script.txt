@@ -2,28 +2,22 @@
 
 LOG="/home/tatvika/hbt.log"
 ALERT_LOG="/home/tatvika/email.log"
+THRESHOLD=210   # seconds
 
 NOW=$(date +%s)
 
-# Get last heartbeat line
-LAST_LINE=$(grep -E "[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2},.*Ack\(Heart Beat\) received from NPCI" "$LOG" | tail -1)
+LAST_LINE=$(grep -E "Ack\(Heart Beat\) received from NPCI" "$LOG" | tail -1)
 
-# If no heartbeat found at all
 if [ -z "$LAST_LINE" ]; then
     echo "$(date '+%Y/%m/%d %H:%M:%S') Heartbeat NOT found in entire log" >> "$ALERT_LOG"
     exit 1
 fi
 
-# Extract timestamp (YYYY/MM/DD HH:MM:SS)
-LAST_TS=$(echo "$LAST_LINE" | awk '{print $1, $2}' | sed 's/,//')
+LAST_TS=$(echo "$LAST_LINE" | cut -c1-19)
+LAST_TS_EPOCH=$(date -d "$(echo "$LAST_TS" | tr '/' '-')" +%s)
 
-# Convert timestamp to epoch
-LAST_TS_EPOCH=$(date -d "$(echo "$LAST_TS" | sed 's/\//-/g')" +%s)
-
-# Time difference in seconds
 DIFF=$(( NOW - LAST_TS_EPOCH ))
 
-# If last heartbeat is older than 3 minutes (180 seconds)
-if [ "$DIFF" -ge 180 ]; then
+if [ "$DIFF" -gt "$THRESHOLD" ]; then
     echo "$(date '+%Y/%m/%d %H:%M:%S') Heartbeat missing. Last heartbeat at $LAST_TS" >> "$ALERT_LOG"
 fi
