@@ -1,0 +1,33 @@
+#!/bin/sh
+
+LOG="/home/tatvika/hbt.log"
+ALERT_LOG="/home/tatvika/email.log"
+THRESHOLD=100   # 3 minutes
+
+NOW=$(date +%s)
+
+# Extract ONLY timestamp (safe)
+LAST_TS=$(tail -1000 "$LOG" \
+  | grep -E "Ack\(Heart Beat\) received from NPCI" \
+  | tail -1 \
+  | awk -F'[ ,]' '{print $1, $2}' \
+  | while read d t; do
+      date -d "$d $t" +%s
+    done
+)
+
+# No heartbeat found
+if [ -z "$LAST_TS" ]; then
+  echo "$(date '+%Y/%m/%d %H:%M:%S') ALERT: No heartbeat found in last 1000 lines" >> "$ALERT_LOG"
+  exit 1
+fi
+
+DIFF=$(( NOW - LAST_TS ))
+
+if [ "$DIFF" -gt "$THRESHOLD" ]; then
+  LAST_TIME=$(date -d "@$LAST_TS" '+%Y/%m/%d %H:%M:%S')
+  echo "$(date '+%Y/%m/%d %H:%M:%S') ALERT: Heartbeat missing for ${DIFF}s. Last heartbeat at $LAST_TIME" >> "$ALERT_LOG"
+  exit 1
+fi
+
+exit 0
